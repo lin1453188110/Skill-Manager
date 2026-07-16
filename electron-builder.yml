@@ -1,0 +1,17 @@
+appId: com.skillmanager.app
+productName: Skill Manager
+directories:
+  output: release
+files:
+  - dist
+  - dist-electron
+  - node_modules
+  - package.json
+asar: false
+win:
+  target: nsis
+  sign: null
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

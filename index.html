@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skill Manager</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="error-fallback" style="display:none; padding:20px; color:red; font-family:monospace; white-space:pre-wrap;"></div>
+    <script>
+      // 全局错误捕获 - 在 React 崩溃前就能看到错误
+      window.onerror = function(msg, url, line, col, err) {
+        var el = document.getElementById('error-fallback');
+        el.style.display = 'block';
+        el.innerHTML = '❌ JS错误:\\n' + msg + '\\n文件: ' + url + ':' + line + ':' + col + '\\n' + (err && err.stack || '');
+        document.getElementById('root').style.display = 'none';
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        var el = document.getElementById('error-fallback');
+        el.style.display = 'block';
+        el.innerHTML = '❌ Promise错误:\\n' + (e.reason && (e.reason.message || e.reason)) + '\\n' + (e.reason && e.reason.stack || '');
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>连接测试</title>
+<style>
+body { font-family: sans-serif; padding: 40px; background: #1e1e1e; color: #ccc; }
+.pass { color: #4caf50; } .fail { color: #f44336; } .info { color: #2196f3; }
+.card { background:#2d2d2d; padding:16px; margin:8px 0; border-radius:8px; }
+pre { background:#1a1a1a; padding:12px; border-radius:4px; overflow-x:auto; }
+</style>
+</head>
+<body>
+<h1>Skill Manager 连接测试</h1>
+
+<div class="card">
+  <h3>1. 页面加载</h3>
+  <p id="step1" class="info">✅ 页面加载成功</p>
+</div>
+
+<div class="card">
+  <h3>2. Electron API</h3>
+  <p id="step2">检查中...</p>
+  <pre id="step2detail"></pre>
+</div>
+
+<div class="card">
+  <h3>3. 后端连接</h3>
+  <p id="step3">检查中...</p>
+  <pre id="step3detail"></pre>
+</div>
+
+<div class="card">
+  <h3>4. 插件数据</h3>
+  <p id="step4">检查中...</p>
+  <pre id="step4detail"></pre>
+</div>
+
+<script>
+(async function() {
+  // Step 2: Check Electron API
+  const s2 = document.getElementById('step2');
+  const s2d = document.getElementById('step2detail');
+  try {
+    s2d.textContent = 'window.electronAPI: ' + JSON.stringify(Object.keys(window.electronAPI || {}));
+    if (window.electronAPI && window.electronAPI.getBackendPort) {
+      const port = await window.electronAPI.getBackendPort();
+      s2.className = 'pass';
+      s2.textContent = '✅ Electron API 正常，后端端口: ' + port;
+      s2d.textContent += '\ngetBackendPort() = ' + port;
+
+      // Step 3: Test backend
+      const s3 = document.getElementById('step3');
+      const s3d = document.getElementById('step3detail');
+      try {
+        const res = await fetch('http://127.0.0.1:' + port + '/api/health');
+        const json = await res.json();
+        s3.className = 'pass';
+        s3.textContent = '✅ 后端连接成功: ' + JSON.stringify(json);
+        s3d.textContent = 'GET /api/health\n' + JSON.stringify(json, null, 2);
+
+        // Step 4: Test plugins
+        const s4 = document.getElementById('step4');
+        const s4d = document.getElementById('step4detail');
+        try {
+          const pRes = await fetch('http://127.0.0.1:' + port + '/api/plugins');
+          const pJson = await pRes.json();
+          s4.className = 'pass';
+          s4.textContent = '✅ 获取到 ' + pJson.data.length + ' 个插件';
+          s4d.textContent = 'GET /api/plugins\n' + JSON.stringify(pJson.data.map(p => ({
+            name: p.name, version: p.version, skills: p.skillCount, enabled: p.enabled
+          })), null, 2);
+        } catch(e4) {
+          s4.className = 'fail';
+          s4.textContent = '❌ 插件数据获取失败';
+          s4d.textContent = '错误: ' + e4.message;
+        }
+      } catch(e3) {
+        s3.className = 'fail';
+        s3.textContent = '❌ 后端连接失败';
+        s3d.textContent = '端口 ' + port + ' 错误: ' + e3.message;
+      }
+    } else {
+      // Fallback: try default ports
+      s2.className = 'fail';
+      s2.textContent = '❌ electronAPI 不可用，尝试直接连接...';
+      for (const port of [3001, 5173]) {
+        try {
+          const res = await fetch('http://127.0.0.1:' + port + '/api/health');
+          const json = await res.json();
+          s2.className = 'pass';
+          s2.textContent += '\n✅ 在端口 ' + port + ' 找到后端';
+          break;
+        } catch(e) {
+          s2d.textContent += '\n端口 ' + port + ': ' + e.message;
+        }
+      }
+    }
+  } catch(e) {
+    s2.className = 'fail';
+    s2.textContent = '❌ Electron API 异常';
+    s2d.textContent = '错误: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
