@@ -1,6 +1,6 @@
 import { Express, Request, Response } from 'express'
 import { getAllPlugins, getPluginSkills } from '../services/plugin-scanner'
-import { togglePlugin } from '../services/settings-service'
+import { togglePlugin, removePlugin, createPlugin } from '../services/settings-service'
 
 export function registerPluginRoutes(app: Express): void {
   // 获取所有插件
@@ -25,6 +25,30 @@ export function registerPluginRoutes(app: Express): void {
       const updated = plugins.find(p => p.id === id)
 
       res.json({ success: true, data: updated })
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message })
+    }
+  })
+
+  // 新建插件
+  app.post('/api/plugins', async (req: Request, res: Response) => {
+    try {
+      const { name, marketplace, description } = req.body
+      if (!name || !marketplace) {
+        return res.status(400).json({ success: false, error: '请提供插件名称和市场' })
+      }
+      const id = await createPlugin(name, marketplace, description)
+      res.json({ success: true, data: { id } })
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message })
+    }
+  })
+
+  // 删除插件
+  app.delete('/api/plugins/:id', async (req: Request, res: Response) => {
+    try {
+      await removePlugin(req.params.id)
+      res.json({ success: true })
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message })
     }

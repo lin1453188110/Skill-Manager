@@ -51,6 +51,8 @@ export interface MarketplacePlugin {
   marketplace: string
   installed: boolean
   sourceUrl: string
+  sourceType?: string
+  sourcePath?: string
   category?: string
   installs?: number
 }

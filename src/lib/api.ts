@@ -34,6 +34,15 @@ export async function togglePlugin(id: string, enabled: boolean): Promise<void> 
   await api.put(`/plugins/${encodeURIComponent(id)}/toggle`, { enabled })
 }
 
+export async function deletePlugin(id: string): Promise<void> {
+  await api.delete(`/plugins/${encodeURIComponent(id)}`)
+}
+
+export async function createPlugin(name: string, marketplace: string, description?: string): Promise<string> {
+  const { data } = await api.post<ApiResponse<{ id: string }>>('/plugins', { name, marketplace, description })
+  return data.data?.id || ''
+}
+
 export async function fetchPluginSkills(pluginId: string): Promise<SkillSummary[]> {
   const { data } = await api.get<ApiResponse<SkillSummary[]>>(`/plugins/${encodeURIComponent(pluginId)}/skills`)
   return data.data || []
@@ -84,13 +93,29 @@ export async function fetchOfficialPlugins(): Promise<MarketplacePlugin[]> {
 export async function installMarketplacePlugin(
   marketplaceId: string,
   pluginName: string,
-  sourceUrl: string
+  sourceUrl: string,
+  sourceType?: string,
+  sourcePath?: string,
+  progressKey?: string
 ): Promise<void> {
   try {
-    await api.post('/marketplaces/install', { marketplaceId, pluginName, sourceUrl })
+    // 安装可能需要 git clone，超时设 10 分钟（不再中断后台安装）
+    await api.post('/marketplaces/install', { marketplaceId, pluginName, sourceUrl, sourceType, sourcePath, progressKey }, { timeout: 600000 })
   } catch (err: any) {
     throw new Error(err?.response?.data?.error || err?.message || '安装失败')
   }
+}
+
+export interface InstallProgressData {
+  key: string
+  status: 'pending' | 'cloning' | 'zipping' | 'done' | 'error'
+  percent: number
+  message: string
+}
+
+export async function fetchInstallProgress(key: string): Promise<InstallProgressData | null> {
+  const { data } = await api.get<ApiResponse<InstallProgressData>>(`/marketplaces/install/progress/${encodeURIComponent(key)}`)
+  return data.data || null
 }
 
 // ===== 历史 =====

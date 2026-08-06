@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { Card, List, Button, Tag, Typography, Spin, Input, message, Space, Tabs } from 'antd'
+import { useState, useEffect, useRef } from 'react'
+import { Card, List, Button, Tag, Typography, Spin, Input, message, Space, Tabs, Progress, Modal } from 'antd'
 import { DownloadOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { fetchMarketplaces, fetchMarketplacePlugins, fetchOfficialPlugins, installMarketplacePlugin } from '../lib/api'
+import { fetchMarketplaces, fetchMarketplacePlugins, fetchOfficialPlugins, installMarketplacePlugin, fetchInstallProgress } from '../lib/api'
 import type { MarketplaceInfo, MarketplacePlugin } from '../lib/types'
 
 export default function Marketplace() {
@@ -11,17 +11,54 @@ export default function Marketplace() {
   const [installing, setInstalling] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [activeMarketplace, setActiveMarketplace] = useState<string>('')
+  // 安装进度
+  const [progressPercent, setProgressPercent] = useState(0)
+  const [progressMsg, setProgressMsg] = useState('')
+  const [progressModalOpen, setProgressModalOpen] = useState(false)
+  const [progressStatus, setProgressStatus] = useState<'active' | 'success' | 'exception'>('active')
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     loadMarketplaces()
+    return () => { if (pollTimer.current) clearInterval(pollTimer.current) }
   }, [])
+
+  function stopPolling() {
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current)
+      pollTimer.current = null
+    }
+  }
+
+  async function pollProgress(key: string) {
+    try {
+      const p = await fetchInstallProgress(key)
+      if (!p) return
+      setProgressPercent(p.percent)
+      setProgressMsg(p.message)
+      if (p.status === 'done') {
+        setProgressStatus('success')
+        setProgressMsg('安装完成')
+        stopPolling()
+        setTimeout(() => setProgressModalOpen(false), 800)
+        setInstalling(null)
+        loadPlugins(activeMarketplace)
+        message.success('安装成功')
+      } else if (p.status === 'error') {
+        setProgressStatus('exception')
+        stopPolling()
+        setInstalling(null)
+      }
+    } catch {
+      // 忽略轮询错误
+    }
+  }
 
   async function loadMarketplaces() {
     setLoading(true)
     try {
       const mps = await fetchMarketplaces()
       setMarketplaces(mps)
-      // 默认显示官方市场
       setActiveMarketplace('official')
       await loadPlugins('official')
     } catch {
@@ -46,15 +83,24 @@ export default function Marketplace() {
   }
 
   async function handleInstall(mp: MarketplacePlugin) {
+    const progressKey = `install-${mp.name}-${Date.now()}`
     setInstalling(mp.id)
+    setProgressPercent(0)
+    setProgressMsg('准备安装...')
+    setProgressStatus('active')
+    setProgressModalOpen(true)
+
+    // 启动进度轮询
+    if (pollTimer.current) clearInterval(pollTimer.current)
+    pollTimer.current = setInterval(() => pollProgress(progressKey), 500)
+
     try {
-      await installMarketplacePlugin(mp.marketplace, mp.name, mp.sourceUrl)
-      message.success(`${mp.name} 安装成功`)
-      // 刷新列表
-      await loadPlugins(activeMarketplace)
+      await installMarketplacePlugin(mp.marketplace, mp.name, mp.sourceUrl, (mp as any).sourceType, (mp as any).sourcePath, progressKey)
+      // 等待轮询确认完成
     } catch (err: any) {
-      message.error('安装失败: ' + (err?.message || '网络错误'))
-    } finally {
+      stopPolling()
+      setProgressStatus('exception')
+      setProgressMsg('安装失败: ' + (err?.message || '网络错误'))
       setInstalling(null)
     }
   }
@@ -139,6 +185,20 @@ export default function Marketplace() {
           )}
         </>
       )}
+
+      {/* 安装进度 Modal */}
+      <Modal
+        title="正在安装插件"
+        open={progressModalOpen}
+        footer={null}
+        closable={false}
+        maskClosable={false}
+      >
+        <Progress percent={progressPercent} status={progressStatus} />
+        <Typography.Text type="secondary" style={{ display: 'block', textAlign: 'center', marginTop: 8 }}>
+          {progressMsg}
+        </Typography.Text>
+      </Modal>
     </div>
   )
 }
